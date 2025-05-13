@@ -83,47 +83,38 @@ func formatTags(tags []string) string {
 
 // InitializeUITemplateData Initializes the data for a UI template, fetching it from registry and db and merging.
 func InitializeUITemplateData(settings utils.DockerRegistryUISettings,
-	handle *persistence.DBHandle, client *utils.RegistryHTTPClient) UITemplateData {
-	return *createUITemplateDataWithRegistryImages(settings, handle, client.RetreiveRegistryImages())
+	client *utils.RegistryHTTPClient) UITemplateData {
+	return *createUITemplateDataWithRegistryImages(settings, client.RetreiveRegistryImages())
 }
 
 // RefreshUITemplateDataIfNecessary Checks if newer information for the template is available.
 // Updates und returns true if yes. Returns false if unchanged.
 func RefreshUITemplateDataIfNecessary(settings utils.DockerRegistryUISettings,
-	handle *persistence.DBHandle, client *utils.RegistryHTTPClient, data *UITemplateData) bool {
+	client *utils.RegistryHTTPClient, data *UITemplateData) bool {
 	var imageMetaData []utils.DockerImageMetaData
 	for _, image := range data.Images {
 		imageMetaData = append(imageMetaData, &image)
 	}
 	if newerRegistryImages, useOldData := client.CheckUpToDateOrRetreiveRegistryImages(imageMetaData); !useOldData {
-		(*data) = (*createUITemplateDataWithRegistryImages(settings, handle, newerRegistryImages))
+		(*data) = (*createUITemplateDataWithRegistryImages(settings, newerRegistryImages))
 		return true
 	}
 	return false
 }
 
 func createUITemplateDataWithRegistryImages(settings utils.DockerRegistryUISettings,
-	handle *persistence.DBHandle, registryImages []utils.RegistryImage) *UITemplateData {
+	registryImages []utils.RegistryImage) *UITemplateData {
 	data := UITemplateData{
 		Settings: settings,
 		HelloMessage: "Welcome to the **DockerRegistry UI**. " +
 			"Check out the documentation at: https://github.com/joakimkistowski/dockerregistryUI/",
-		Categories:       handle.FindAllImageCategories(),
 		filterCategoryID: 0,
-	}
-	if hello, notFound := handle.FindHelloMessage(); notFound == nil {
-		data.HelloMessage = hello
 	}
 	unsafeFormattedHello := []byte(markdownRenderer.RenderToString([]byte(data.HelloMessage)))
 	data.FormattedHelloMessage = template.HTML(bluemonday.UGCPolicy().SanitizeBytes(unsafeFormattedHello))
 	for _, registryImage := range registryImages {
 		var imageData ImageData
-		if description, err := handle.FindImageDescriptionByName(registryImage.ImageName); err == nil {
-			imageData = MergeAndFormatImageData(registryImage, description)
-
-		} else {
-			imageData = MergeAndFormatImageData(registryImage, &persistence.ImageDescription{})
-		}
+		imageData = MergeAndFormatImageData(registryImage, &persistence.ImageDescription{})
 		imageData.populateOtherCategories(data.Categories)
 		data.Images = append(data.Images, imageData)
 	}
