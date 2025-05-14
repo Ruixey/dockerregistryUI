@@ -142,7 +142,7 @@
         // Enhance tag strings into individual, sorted, clickable tag elements
         document.querySelectorAll('.image-tags span[id^="tags-"]').forEach(el => {
             const raw = el.textContent;
-            const tags = raw.split(',').map(t => t.trim()).filter(t => t.length > 0);
+            const tags = raw.split(',').map(t => t.trim()).filter(t => t.length > 0 && !t.endsWith('.sig'));
 
             // Sort tags by length
             tags.sort((a, b) => a.length - b.length);

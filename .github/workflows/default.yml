@@ -1,0 +1,25 @@
+name: Deploy Image
+
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  docker:
+    uses: Ruixey/workflows/.github/workflows/deploy-container.yml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      registry: registry.spizza.cc
+      image-name: ${{ github.repository }}
+    secrets:
+      username: ${{ secrets.REGISTRY_USERNAME }}
+      password: ${{ secrets.REGISTRY_PASSWORD }}
