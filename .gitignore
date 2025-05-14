@@ -56,3 +56,6 @@ target/
 
 # environment variables used in development
 /vars
+
+# docker
+compose.yaml

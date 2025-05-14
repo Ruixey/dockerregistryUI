@@ -1,30 +1,18 @@
-FROM golang:alpine
-#build container
-RUN apk add --update-cache build-base git
-RUN mkdir -p /go/src/dockerregistryUI/
-WORKDIR /go/src/dockerregistryUI/
-COPY ./*.go .
-COPY ./handlers ./handlers
-COPY ./persistence ./persistence
-COPY ./utils ./utils
-RUN go get -u github.com/microcosm-cc/bluemonday
-RUN go get -u gitlab.com/golang-commonmark/markdown
-RUN go get -u github.com/jinzhu/gorm
-RUN go get -u github.com/jinzhu/gorm/dialects/sqlite
-RUN go test ./persistence
-RUN GOOS=linux go build -v .
+FROM golang:alpine AS builder
 
-RUN mkdir -p /opt/dockerregistryUI/
-COPY ./templates /opt/dockerregistryUI/templates
-COPY ./static /opt/dockerregistryUI/static
+WORKDIR /app
+
+COPY . .
+
+RUN go build -o registryUI
+
 
 FROM alpine
-# Execution Container
-RUN apk add --no-cache ca-certificates openssl
-COPY --from=0 /opt/dockerregistryUI /opt/dockerregistryui
-COPY --from=0 /go/src/dockerregistryUI/dockerregistryUI /opt/dockerregistryui/dockerregistryui
 
-RUN mkdir /data
+WORKDIR /app
+COPY --from=builder /app/registryUI .
+COPY templates templates
+COPY static static
 
 ENV REGISTRY_HOST ""
 ENV REGISTRY_PROTOCOL https
@@ -32,9 +20,7 @@ ENV REGISTRY_URL ""
 ENV IGNORE_INSECURE_HTTPS false
 ENV REGISTRY_BASIC_AUTH_USER ""
 ENV REGISTRY_BASIC_AUTH_PASSWORD ""
-VOLUME /data
 
 EXPOSE 8080
 
-WORKDIR /opt/dockerregistryui
-ENTRYPOINT ["/opt/dockerregistryui/dockerregistryui"]
+ENTRYPOINT ["./registryUI"]
