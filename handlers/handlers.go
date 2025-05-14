@@ -39,10 +39,6 @@ func (context *HandlerContext) IndexHandler(w http.ResponseWriter, r *http.Reque
 		context.cache.Flush()
 		context.cache.Cache(templateData)
 	}
-	categoryQuery := r.URL.Query().Get("category")
-	if categoryID, err := strconv.ParseUint(categoryQuery, 10, 64); err == nil {
-		templateData.FilterImages(uint(categoryID))
-	}
 	setCommonHeaders(w)
 	err := templates.ExecuteTemplate(w, "index.gohtml", templateData)
 	if err != nil {

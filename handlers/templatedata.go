@@ -3,13 +3,10 @@ package handlers
 import (
 	"dockerregistryUI/persistence"
 	"dockerregistryUI/utils"
-	"encoding/base64"
-	"html"
 	"html/template"
 	"regexp"
 	"strings"
 
-	"github.com/microcosm-cc/bluemonday"
 	"gitlab.com/golang-commonmark/markdown"
 )
 
@@ -19,24 +16,15 @@ var markdownRenderer = markdown.New()
 
 // UITemplateData Data passed to the HTML template.
 type UITemplateData struct {
-	Settings              utils.DockerRegistryUISettings
-	HelloMessage          string
-	FormattedHelloMessage template.HTML
-	Categories            []persistence.ImageCategory
-	Images                []ImageData
-	filterCategoryID      uint
+	Settings utils.DockerRegistryUISettings
+	Images   []ImageData
 }
 
 // ImageData Data about an image, collected from registry and database.
 type ImageData struct {
-	Name                    string
-	NameB64                 string
-	Tags                    []string
-	FormattedTags           string
-	FormattedDescription    template.HTML
-	FormattedExampleCommand template.HTML
-	Description             *persistence.ImageDescription
-	OtherCategories         []persistence.ImageCategory
+	Name          string
+	Tags          []string
+	FormattedTags string
 }
 
 // UITemplateCache Caches the template's data until the next database change.*/
@@ -57,16 +45,8 @@ type inMemoryUITemplateCache struct {
 func MergeAndFormatImageData(image utils.RegistryImage, description *persistence.ImageDescription) ImageData {
 	var data ImageData
 	data.Name = image.ImageName
-	data.NameB64 = base64.RawURLEncoding.EncodeToString([]byte(image.ImageName))
 	data.Tags = image.ImageTags
 	data.FormattedTags = formatTags(data.Tags)
-	data.Description = description
-	unsafeFormattedDescription := []byte(markdownRenderer.RenderToString([]byte(description.Description)))
-	data.FormattedDescription = template.HTML(bluemonday.UGCPolicy().SanitizeBytes(unsafeFormattedDescription))
-	unsafeFormattedExCommand := html.EscapeString(description.ExampleCommand)
-	unsafeFormattedExCommand = autolinkRegex.ReplaceAllString(unsafeFormattedExCommand, `<a href="$1">$1</a>`)
-	data.FormattedExampleCommand =
-		template.HTML(bluemonday.UGCPolicy().SanitizeBytes([]byte(unsafeFormattedExCommand)))
 	return data
 }
 
@@ -104,58 +84,13 @@ func RefreshUITemplateDataIfNecessary(settings utils.DockerRegistryUISettings,
 
 func createUITemplateDataWithRegistryImages(settings utils.DockerRegistryUISettings,
 	registryImages []utils.RegistryImage) *UITemplateData {
-	data := UITemplateData{
-		Settings: settings,
-		HelloMessage: "Welcome to the **DockerRegistry UI**. " +
-			"Check out the documentation at: https://github.com/joakimkistowski/dockerregistryUI/",
-		filterCategoryID: 0,
-	}
-	unsafeFormattedHello := []byte(markdownRenderer.RenderToString([]byte(data.HelloMessage)))
-	data.FormattedHelloMessage = template.HTML(bluemonday.UGCPolicy().SanitizeBytes(unsafeFormattedHello))
+	data := UITemplateData{Settings: settings}
 	for _, registryImage := range registryImages {
 		var imageData ImageData
 		imageData = MergeAndFormatImageData(registryImage, &persistence.ImageDescription{})
-		imageData.populateOtherCategories(data.Categories)
 		data.Images = append(data.Images, imageData)
 	}
 	return &data
-}
-
-// FilterImages Adds a temporary filter to the template so that only images with the provided categoryID are shown.
-func (data *UITemplateData) FilterImages(categoryID uint) {
-	data.filterCategoryID = categoryID
-}
-
-// ImageMatchesCurrentFilter Checks if the image should be displayed considering current filter settings.
-func (data UITemplateData) ImageMatchesCurrentFilter(image ImageData) bool {
-	//all images are displayed with no filter
-	if data.filterCategoryID == 0 {
-		return true
-	}
-	for _, category := range image.Description.Categories {
-		if category.ID == data.filterCategoryID {
-			return true
-		}
-	}
-	return false
-}
-
-func (imageData *ImageData) populateOtherCategories(allCategories []persistence.ImageCategory) {
-	imageData.OtherCategories = imageData.OtherCategories[:0]
-	for _, cat := range allCategories {
-		if !containsCategory(imageData.Description.Categories, cat) {
-			imageData.OtherCategories = append(imageData.OtherCategories, cat)
-		}
-	}
-}
-
-func containsCategory(categories []persistence.ImageCategory, category persistence.ImageCategory) bool {
-	for _, cat := range categories {
-		if cat.ID == category.ID {
-			return true
-		}
-	}
-	return false
 }
 
 // Cache Caches the current UI template data in local memory.
