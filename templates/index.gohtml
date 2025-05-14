@@ -1,74 +1,179 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>{{.Settings.RegistryHostName}} UI</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
-    <!-- Bootstrap CSS -->
+
+    <!-- Bootstrap CDN -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-    
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{.Settings.ContextRoot}}/static/favicon.png">
 
+    <!-- Dark & Minimal Styling -->
     <style>
         body {
             padding-top: 70px;
+            background-color: #1e1e1e;
+            color: #eee;
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
+
+        .navbar-inverse {
+            background-color: #121212;
+            border: none;
+        }
+
+        .navbar-inverse .navbar-brand {
+            color: #eee;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .navbar-inverse .navbar-brand:hover {
+            color: #fff;
+        }
+
+        .container {
+            max-width: 960px;
+        }
+
         .image-card {
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 15px;
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
             margin-bottom: 20px;
-            background-color: #f9f9f9;
+            box-shadow: 0 0 8px rgba(0,0,0,0.3);
+            overflow-x: auto;
         }
+
         .image-name {
-            font-weight: bold;
-            font-size: 18px;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #ffffff;
         }
+
         .image-tags {
-            color: #555;
-            margin-top: 5px;
-            word-wrap: break-word;
+            display: inline-block;
+            white-space: nowrap;
+            overflow-x: auto;
         }
-        @media (min-width: 768px) {
-            .image-name, .image-tags {
-                display: inline-block;
-                vertical-align: top;
-            }
-            .image-name {
-                width: 30%;
-            }
-            .image-tags {
-                width: 68%;
-                margin-left: 2%;
-            }
+
+        .image-tags .tag {
+            display: inline-block;
+            background-color: #3f51b5;
+            color: #fff;
+            padding: 5px 10px;
+            margin: 4px 6px 0 0;
+            border-radius: 20px;
+            font-size: 12px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .image-tags .tag:hover {
+            background-color: #5c6bc0;
+        }
+
+        #copy-toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color:rgb(52, 163, 0);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 9999;
+        }
+
+        #copy-toast.show {
+            opacity: 1;
+        }
+
+        a {
+            color: #90caf9;
+        }
+
+        a:hover {
+            text-decoration: none;
+            color: #bbdefb;
         }
     </style>
 </head>
 <body>
     <!-- Navbar -->
     <nav class="navbar navbar-inverse navbar-fixed-top">
-        <div class="container-fluid">
+        <div class="container">
             <div class="navbar-header">
-                <a class="navbar-brand" href="{{.Settings.ContextRoot}}/">{{.Settings.RegistryHostName}}</a>
+                <a class="navbar-brand" href="{{.Settings.ContextRoot}}/">
+                    {{.Settings.RegistryHostName}}
+                </a>
             </div>
         </div>
     </nav>
 
-    <!-- Content -->
-    <div class="container">
-        <div id="images" class="row">
-            {{range .Images}}
-            <div class="col-xs-12 image-card">
-                <div class="image-name">{{.Name}}</div>
-                <div class="image-tags">{{.FormattedTags}}</div>
+    <!-- Main Content -->
+    <div class="container" id="images">
+        {{range .Images}}
+        <div class="image-card">
+            <div class="image-name">{{.Name}}</div>
+            <div class="image-tags">
+                <span id="tags-{{.Name | html}}">{{.FormattedTags}}</span>
             </div>
-            {{end}}
         </div>
+        {{end}}
     </div>
+
+    <!-- Toast Notification -->
+    <div id="copy-toast">Copied!</div>
 
     <!-- Scripts -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+    <script>
+        // Enhance tag strings into individual, sorted, clickable tag elements
+        document.querySelectorAll('.image-tags span[id^="tags-"]').forEach(el => {
+            const raw = el.textContent;
+            const tags = raw.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+            // Sort tags by length
+            tags.sort((a, b) => a.length - b.length);
+
+            // Render each tag
+            el.innerHTML = tags
+                .map(t => `<span class="tag" data-tag="${t}" title="Click to copy">${t}</span>`)
+                .join('');
+        });
+
+        // Show toast
+        function showCopyToast() {
+            const toast = document.getElementById('copy-toast');
+            toast.classList.add('show');
+            clearTimeout(toast._timeout);
+            toast._timeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 1200);
+        }
+
+        // Copy tag to clipboard on click
+        document.addEventListener('click', function (e) {
+            if (e.target.classList.contains('tag')) {
+                const text = e.target.getAttribute('data-tag');
+                navigator.clipboard.writeText(text).then(() => {
+                    showCopyToast();
+                }).catch(err => {
+                    console.error('Copy failed', err);
+                });
+            }
+        });
+    </script>
 </body>
 </html>
